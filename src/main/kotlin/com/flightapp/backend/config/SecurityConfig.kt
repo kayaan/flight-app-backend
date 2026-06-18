@@ -16,6 +16,7 @@ class SecurityConfig {
 
             authorizeHttpRequests {
                 authorize("/api/health", permitAll)
+                authorize("/api/test/users/**", permitAll)
                 authorize(anyRequest, authenticated)
             }
 
