@@ -1,0 +1,22 @@
+spring:
+  application:
+    name: flightapp-backend
+
+  datasource:
+    url: jdbc:postgresql://172.26.219.217:5433/flightapp
+    username: flightapp
+    password: flightapp
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    enabled: true
+
+server:
+  port: 8080
