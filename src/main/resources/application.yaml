@@ -32,3 +32,8 @@ spring:
 
 server:
   port: 8080
+
+flightapp:
+  storage:
+    connection-string: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFeqCnf2mpD7/9psL7++hX4wNslbtdMgRY9z5KJeOfhFz6MD+KQC6T4XQ8v9su1phcp2MA==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;"
+    container-name: flight-files

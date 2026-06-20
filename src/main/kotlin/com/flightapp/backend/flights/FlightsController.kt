@@ -1,32 +1,29 @@
 package com.flightapp.backend.flights
 
-import com.flightapp.backend.auth.CurrentUserService
 import jakarta.validation.Valid
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
+import org.springframework.http.MediaType
+import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.security.oauth2.core.oidc.user.OidcUser
-import org.springframework.web.server.ResponseStatusException
-import java.time.Instant
-import java.util.UUID
 import org.springframework.web.bind.annotation.*
+import org.springframework.web.multipart.MultipartFile
+import java.util.UUID
 
 @RestController
 @RequestMapping("/api/flights")
 class FlightsController(
-    private val flightRepository: FlightRepository,
-    private val currentUserService: CurrentUserService,
-    private val flightFileRepository: FlightFileRepository
+    private val flightService: FlightService,
+    private val flightFileService: FlightFileService
 ) {
+
     @GetMapping
     fun getFlights(
         @AuthenticationPrincipal oidcUser: OidcUser?
     ): List<FlightDto> {
-        val user = currentUserService.requireCurrentUser(oidcUser)
-
-        return flightRepository.findByUserAndDeletedAtUtcIsNullOrderByImportedAtUtcDesc(user)
-            .map { FlightDto.from(it) }
+        return flightService.getFlights(oidcUser)
     }
-
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -34,59 +31,21 @@ class FlightsController(
         @AuthenticationPrincipal oidcUser: OidcUser?,
         @Valid @RequestBody request: CreateFlightRequest
     ): FlightDto {
-        val user = currentUserService.requireCurrentUser(oidcUser)
-
-        val duplicateExists = flightRepository
-            .existsByUserAndFileHashAndDeletedAtUtcIsNull(
-                user = user,
-                fileHash = request.fileHash
-            )
-
-        if (duplicateExists) {
-            throw ResponseStatusException(
-                HttpStatus.CONFLICT,
-                "Flight with same file hash already exists"
-            )
-        }
-
-        val now = Instant.now()
-
-        val flight = Flight(
-            id = UUID.randomUUID(),
-            user = user,
-            fileName = request.fileName,
-            fileHash = request.fileHash,
-            flightDate = request.flightDate,
-            pilot = request.pilot,
-            glider = request.glider,
-            visibility = request.visibility,
-            importedAtUtc = now,
-            createdAtUtc = now,
-            updatedAtUtc = now
+        return flightService.createFlight(
+            oidcUser = oidcUser,
+            request = request
         )
-
-        val saved = flightRepository.save(flight)
-
-        return FlightDto.from(saved)
     }
-
 
     @GetMapping("/{id}")
     fun getFlight(
-        @AuthenticationPrincipal oidcUser: OidcUser,
+        @AuthenticationPrincipal oidcUser: OidcUser?,
         @PathVariable id: UUID
     ): FlightDto {
-        val user = currentUserService.requireCurrentUser(oidcUser)
-
-        val flight = flightRepository.findByIdAndUserAndDeletedAtUtcIsNull(
-            id = id,
-            user = user
-        ) ?: throw ResponseStatusException(
-            HttpStatus.NOT_FOUND,
-            "Flight not found"
+        return flightService.getFlight(
+            oidcUser = oidcUser,
+            flightId = id
         )
-
-        return FlightDto.from(flight)
     }
 
     @DeleteMapping("/{id}")
@@ -95,22 +54,10 @@ class FlightsController(
         @AuthenticationPrincipal oidcUser: OidcUser?,
         @PathVariable id: UUID
     ) {
-        val user = currentUserService.requireCurrentUser(oidcUser)
-
-        val flight = flightRepository.findByIdAndUserAndDeletedAtUtcIsNull(
-            id = id,
-            user = user
-        ) ?: throw ResponseStatusException(
-            HttpStatus.NOT_FOUND,
-            "Flight not found"
+        flightService.deleteFlight(
+            oidcUser = oidcUser,
+            flightId = id
         )
-
-        val now = Instant.now()
-
-        flight.deletedAtUtc = now
-        flight.updatedAtUtc = now
-
-        flightRepository.save(flight)
     }
 
     @PatchMapping("/{id}/visibility")
@@ -119,22 +66,11 @@ class FlightsController(
         @PathVariable id: UUID,
         @Valid @RequestBody request: UpdateFlightVisibilityRequest
     ): FlightDto {
-        val user = currentUserService.requireCurrentUser(oidcUser)
-
-        val flight = flightRepository.findByIdAndUserAndDeletedAtUtcIsNull(
-            id = id,
-            user = user
-        ) ?: throw ResponseStatusException(
-            HttpStatus.NOT_FOUND,
-            "Flight not found"
+        return flightService.updateVisibility(
+            oidcUser = oidcUser,
+            flightId = id,
+            request = request
         )
-
-        flight.visibility = request.visibility
-        flight.updatedAtUtc = Instant.now()
-
-        val saved = flightRepository.save(flight)
-
-        return FlightDto.from(saved)
     }
 
     @PostMapping("/{id}/file")
@@ -144,38 +80,11 @@ class FlightsController(
         @PathVariable id: UUID,
         @Valid @RequestBody request: CreateFlightFileRequest
     ): FlightFileDto {
-        val user = currentUserService.requireCurrentUser(oidcUser)
-
-        val flight = flightRepository.findByIdAndUserAndDeletedAtUtcIsNull(
-            id = id,
-            user = user
-        ) ?: throw ResponseStatusException(
-            HttpStatus.NOT_FOUND,
-            "Flight not found"
+        return flightFileService.createFlightFile(
+            oidcUser = oidcUser,
+            flightId = id,
+            request = request
         )
-
-        val existingFile = flightFileRepository.findByFlightId(id)
-
-        if (existingFile != null) {
-            throw ResponseStatusException(
-                HttpStatus.CONFLICT,
-                "Flight file already exists"
-            )
-        }
-
-        val file = FlightFile(
-            id = UUID.randomUUID(),
-            flight = flight,
-            originalIgcBlobName = request.originalIgcBlobName,
-            trackCacheBlobName = request.trackCacheBlobName,
-            fileSizeBytes = request.fileSizeBytes,
-            contentHash = request.contentHash,
-            createdAtUtc = Instant.now()
-        )
-
-        val saved = flightFileRepository.save(file)
-
-        return FlightFileDto.from(saved)
     }
 
     @GetMapping("/{id}/file")
@@ -183,23 +92,10 @@ class FlightsController(
         @AuthenticationPrincipal oidcUser: OidcUser?,
         @PathVariable id: UUID
     ): FlightFileDto {
-        val user = currentUserService.requireCurrentUser(oidcUser)
-
-        val flight = flightRepository.findByIdAndUserAndDeletedAtUtcIsNull(
-            id = id,
-            user = user
-        ) ?: throw ResponseStatusException(
-            HttpStatus.NOT_FOUND,
-            "Flight not found"
+        return flightFileService.getFlightFile(
+            oidcUser = oidcUser,
+            flightId = id
         )
-
-        val file = flightFileRepository.findByFlightId(flight.id)
-            ?: throw ResponseStatusException(
-                HttpStatus.NOT_FOUND,
-                "Flight file not found"
-            )
-
-        return FlightFileDto.from(file)
     }
 
     @PatchMapping("/{id}/file")
@@ -208,40 +104,46 @@ class FlightsController(
         @PathVariable id: UUID,
         @Valid @RequestBody request: UpdateFlightFileRequest
     ): FlightFileDto {
-        val user = currentUserService.requireCurrentUser(oidcUser)
+        return flightFileService.updateFlightFile(
+            oidcUser = oidcUser,
+            flightId = id,
+            request = request
+        )
+    }
 
-        val flight = flightRepository.findByIdAndUserAndDeletedAtUtcIsNull(
-            id = id,
-            user = user
-        ) ?: throw ResponseStatusException(
-            HttpStatus.NOT_FOUND,
-            "Flight not found"
+    @PostMapping(
+        "/{id}/igc",
+        consumes = [MediaType.MULTIPART_FORM_DATA_VALUE]
+    )
+    fun uploadOriginalIgc(
+        @AuthenticationPrincipal oidcUser: OidcUser?,
+        @PathVariable id: UUID,
+        @RequestParam("file") file: MultipartFile
+    ): FlightFileDto {
+        return flightFileService.uploadOriginalIgc(
+            oidcUser = oidcUser,
+            flightId = id,
+            file = file
+        )
+    }
+
+    @GetMapping("/{id}/igc")
+    fun downloadOriginalIgc(
+        @AuthenticationPrincipal oidcUser: OidcUser?,
+        @PathVariable id: UUID
+    ): ResponseEntity<ByteArray> {
+        val download = flightFileService.downloadOriginalIgc(
+            oidcUser = oidcUser,
+            flightId = id
         )
 
-        val file = flightFileRepository.findByFlightId(flight.id)
-            ?: throw ResponseStatusException(
-                HttpStatus.NOT_FOUND,
-                "Flight file not found"
+        return ResponseEntity.ok()
+            .header(
+                HttpHeaders.CONTENT_DISPOSITION,
+                "attachment; filename=\"${download.fileName}\""
             )
-
-        request.originalIgcBlobName?.let {
-            file.originalIgcBlobName = it
-        }
-
-        request.trackCacheBlobName?.let {
-            file.trackCacheBlobName = it
-        }
-
-        request.fileSizeBytes?.let {
-            file.fileSizeBytes = it
-        }
-
-        request.contentHash?.let {
-            file.contentHash = it
-        }
-
-        val saved = flightFileRepository.save(file)
-
-        return FlightFileDto.from(saved)
+            .contentType(MediaType.APPLICATION_OCTET_STREAM)
+            .contentLength(download.bytes.size.toLong())
+            .body(download.bytes)
     }
 }
