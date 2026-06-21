@@ -25,9 +25,6 @@ class FlightFile(
     @Column(name = "original_igc_blob_name")
     var originalIgcBlobName: String? = null,
 
-    @Column(name = "track_cache_blob_name")
-    var trackCacheBlobName: String? = null,
-
     @Column(name = "file_size_bytes")
     var fileSizeBytes: Long? = null,
 

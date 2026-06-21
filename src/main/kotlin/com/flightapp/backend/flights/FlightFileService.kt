@@ -52,7 +52,6 @@ class FlightFileService(
             id = UUID.randomUUID(),
             flight = flight,
             originalIgcBlobName = request.originalIgcBlobName,
-            trackCacheBlobName = request.trackCacheBlobName,
             fileSizeBytes = request.fileSizeBytes,
             contentHash = request.contentHash,
             createdAtUtc = Instant.now()
@@ -111,10 +110,6 @@ class FlightFileService(
             file.originalIgcBlobName = it
         }
 
-        request.trackCacheBlobName?.let {
-            file.trackCacheBlobName = it
-        }
-
         request.fileSizeBytes?.let {
             file.fileSizeBytes = it
         }
@@ -163,7 +158,6 @@ class FlightFileService(
                 id = UUID.randomUUID(),
                 flight = flight,
                 originalIgcBlobName = blobName,
-                trackCacheBlobName = null,
                 fileSizeBytes = file.size,
                 contentHash = contentHash,
                 createdAtUtc = Instant.now()

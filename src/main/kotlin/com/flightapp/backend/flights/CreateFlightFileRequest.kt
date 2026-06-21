@@ -6,9 +6,6 @@ data class CreateFlightFileRequest(
     @field:Size(max = 500)
     val originalIgcBlobName: String? = null,
 
-    @field:Size(max = 500)
-    val trackCacheBlobName: String? = null,
-
     val fileSizeBytes: Long? = null,
 
     @field:Size(max = 128)
