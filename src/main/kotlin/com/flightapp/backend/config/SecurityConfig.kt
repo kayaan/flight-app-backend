@@ -8,7 +8,8 @@ import org.springframework.security.web.SecurityFilterChain
 
 @Configuration
 class SecurityConfig(
-    private val oidcUserService: FlightAppOidcUserService
+    private val oidcUserService: FlightAppOidcUserService,
+    private val frontendProperties: FlightAppFrontendProperties
 ) {
 
     @Bean
@@ -24,6 +25,8 @@ class SecurityConfig(
                     .requestMatchers("/login/**").permitAll()
                     .requestMatchers("/error").permitAll()
                     .requestMatchers("/").permitAll()
+                    .requestMatchers("/api/auth/login/google").permitAll()
+                    .requestMatchers("/api/auth/logout").permitAll()
                     .anyRequest().authenticated()
             }
             .oauth2Login { oauth ->
@@ -31,7 +34,9 @@ class SecurityConfig(
                     .userInfoEndpoint { userInfo ->
                         userInfo.oidcUserService(oidcUserService)
                     }
-                    .defaultSuccessUrl("/api/health", true)
+                    .successHandler { _, response, _ ->
+                        response.sendRedirect("${frontendProperties.baseUrl}/flights")
+                    }
                     .failureUrl("/api/oauth/failure")
             }
             .logout { logout ->

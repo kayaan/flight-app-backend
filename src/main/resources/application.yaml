@@ -35,5 +35,7 @@ server:
 
 flightapp:
   storage:
-    connection-string: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFeqCnf2mpD7/9psL7++hX4wNslbtdMgRY9z5KJeOfhFz6MD+KQC6T4XQ8v9su1phcp2MA==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;"
-    container-name: flight-files
+    connection-string: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://172.26.219.217:10000/devstoreaccount1;"
+    container-name: "flight-files"
+  frontend:
+    base-url: ${FRONTEND_BASE_URL:http://localhost:4200}

@@ -12,6 +12,11 @@ class AzureFlightBlobStorage(
     properties: FlightStorageProperties
 ) : FlightBlobStorage {
 
+    init {
+        println("STORAGE CONNECTION STRING = ${properties.connectionString}")
+        println("STORAGE CONTAINER = ${properties.containerName}")
+    }
+
     private val containerClient: BlobContainerClient =
         BlobServiceClientBuilder()
             .connectionString(properties.connectionString)
