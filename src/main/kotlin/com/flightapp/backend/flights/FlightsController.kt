@@ -35,10 +35,10 @@ class FlightsController(
     }
 
     @PostMapping(
-        "/import",
+        "/sync/upload",
         consumes = [MediaType.MULTIPART_FORM_DATA_VALUE]
     )
-    fun importFlight(
+    fun uploadFlight(
         @AuthenticationPrincipal oidcUser: OidcUser?,
         @Valid @RequestPart("metadata") metadata: ImportFlightRequest,
         @RequestPart("file") file: MultipartFile
