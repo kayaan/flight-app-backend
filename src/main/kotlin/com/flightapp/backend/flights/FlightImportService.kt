@@ -165,7 +165,6 @@ class FlightImportService(
         val stats = flightStatsRepository.findByFlightId(flight.id)
             ?: FlightStats(
                 flightId = flight.id,
-                flight = flight,
                 startIndex = request.startIndex,
                 endIndex = request.endIndex,
                 fixCount = request.fixCount,
@@ -213,7 +212,6 @@ class FlightImportService(
         val flightFile = flightFileRepository.findByFlightId(flight.id)
             ?: FlightFile(
                 flightId = flight.id,
-                flight = flight,
                 igcBlobName = igcBlobName,
                 fileName = fileName,
                 fileSizeBytes = file.size,
@@ -240,7 +238,6 @@ class FlightImportService(
         val flightTrack = flightTrackRepository.findByFlightId(flight.id)
             ?: FlightTrack(
                 flightId = flight.id,
-                flight = flight,
                 trackBlobName = trackBlobName,
                 formatVersion = TRACK_FORMAT_VERSION,
                 pointCount = request.pointCount(),

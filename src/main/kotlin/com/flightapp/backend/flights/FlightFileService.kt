@@ -73,7 +73,6 @@ class FlightFileService(
         val flightFile = flightFileRepository.findByFlightId(flight.id)
             ?: FlightFile(
                 flightId = flight.id,
-                flight = flight,
                 igcBlobName = igcBlobName,
                 fileName = fileName,
                 fileSizeBytes = file.size,
