@@ -6,7 +6,6 @@ import org.springframework.security.oauth2.core.oidc.user.OidcUser
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
 import java.time.Instant
-import java.util.UUID
 
 @Service
 class FlightService(
@@ -28,33 +27,27 @@ class FlightService(
     ): FlightDto {
         val user = currentUserService.requireCurrentUser(oidcUser)
 
-        val duplicateExists = flightRepository
-            .existsByUserAndFileHashAndDeletedAtUtcIsNull(
-                user = user,
-                fileHash = request.fileHash
-            )
-
-        if (duplicateExists) {
+        if (flightRepository.existsByIdAndUserAndDeletedAtUtcIsNull(request.id, user)) {
             throw ResponseStatusException(
                 HttpStatus.CONFLICT,
-                "Flight with same file hash already exists"
+                "Flight already exists."
             )
         }
 
         val now = Instant.now()
 
         val flight = Flight(
-            id = UUID.randomUUID(),
+            id = request.id,
             user = user,
             fileName = request.fileName,
-            fileHash = request.fileHash,
             flightDate = request.flightDate,
             pilot = request.pilot,
             glider = request.glider,
-            visibility = request.visibility,
-            importedAtUtc = now,
+            visibility = FlightVisibility.PRIVATE,
+            importedAtUtc = request.importedAtUtc ?: now,
             createdAtUtc = now,
-            updatedAtUtc = now
+            updatedAtUtc = now,
+            deletedAtUtc = null
         )
 
         val saved = flightRepository.save(flight)
@@ -64,37 +57,20 @@ class FlightService(
 
     fun getFlight(
         oidcUser: OidcUser?,
-        flightId: UUID
+        flightId: String
     ): FlightDto {
-        val user = currentUserService.requireCurrentUser(oidcUser)
-
-        val flight = flightRepository.findByIdAndUserAndDeletedAtUtcIsNull(
-            id = flightId,
-            user = user
-        ) ?: throw ResponseStatusException(
-            HttpStatus.NOT_FOUND,
-            "Flight not found"
-        )
+        val flight = requireOwnedFlight(oidcUser, flightId)
 
         return FlightDto.from(flight)
     }
 
     fun deleteFlight(
         oidcUser: OidcUser?,
-        flightId: UUID
+        flightId: String
     ) {
-        val user = currentUserService.requireCurrentUser(oidcUser)
-
-        val flight = flightRepository.findByIdAndUserAndDeletedAtUtcIsNull(
-            id = flightId,
-            user = user
-        ) ?: throw ResponseStatusException(
-            HttpStatus.NOT_FOUND,
-            "Flight not found"
-        )
+        val flight = requireOwnedFlight(oidcUser, flightId)
 
         val now = Instant.now()
-
         flight.deletedAtUtc = now
         flight.updatedAtUtc = now
 
@@ -103,24 +79,31 @@ class FlightService(
 
     fun updateVisibility(
         oidcUser: OidcUser?,
-        flightId: UUID,
-        request: UpdateFlightVisibilityRequest
+        flightId: String,
+        visibility: FlightVisibility
     ): FlightDto {
-        val user = currentUserService.requireCurrentUser(oidcUser)
+        val flight = requireOwnedFlight(oidcUser, flightId)
 
-        val flight = flightRepository.findByIdAndUserAndDeletedAtUtcIsNull(
-            id = flightId,
-            user = user
-        ) ?: throw ResponseStatusException(
-            HttpStatus.NOT_FOUND,
-            "Flight not found"
-        )
-
-        flight.visibility = request.visibility
+        flight.visibility = visibility
         flight.updatedAtUtc = Instant.now()
 
         val saved = flightRepository.save(flight)
 
         return FlightDto.from(saved)
+    }
+
+    fun requireOwnedFlight(
+        oidcUser: OidcUser?,
+        flightId: String
+    ): Flight {
+        val user = currentUserService.requireCurrentUser(oidcUser)
+
+        return flightRepository.findByIdAndUserAndDeletedAtUtcIsNull(
+            id = flightId,
+            user = user
+        ) ?: throw ResponseStatusException(
+            HttpStatus.NOT_FOUND,
+            "Flight not found."
+        )
     }
 }

@@ -2,21 +2,20 @@ package com.flightapp.backend.flights
 
 import com.flightapp.backend.users.AppUser
 import org.springframework.data.jpa.repository.JpaRepository
-import java.util.UUID
 
-interface FlightRepository : JpaRepository<Flight, UUID> {
+interface FlightRepository : JpaRepository<Flight, String> {
 
     fun findByUserAndDeletedAtUtcIsNullOrderByImportedAtUtcDesc(
         user: AppUser
     ): List<Flight>
 
     fun findByIdAndUserAndDeletedAtUtcIsNull(
-        id: UUID,
+        id: String,
         user: AppUser
     ): Flight?
 
-    fun existsByUserAndFileHashAndDeletedAtUtcIsNull(
-        user: AppUser,
-        fileHash: String
+    fun existsByIdAndUserAndDeletedAtUtcIsNull(
+        id: String,
+        user: AppUser
     ): Boolean
 }

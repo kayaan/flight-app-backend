@@ -2,12 +2,11 @@ package com.flightapp.backend.flights
 
 import java.time.Instant
 import java.time.LocalDate
-import java.util.UUID
 
 data class FlightDto(
-    val id: UUID,
-    val fileName: String,
+    val id: String,
     val fileHash: String,
+    val fileName: String,
     val flightDate: LocalDate?,
     val pilot: String?,
     val glider: String?,
@@ -20,8 +19,8 @@ data class FlightDto(
         fun from(flight: Flight): FlightDto {
             return FlightDto(
                 id = flight.id,
+                fileHash = flight.id,
                 fileName = flight.fileName,
-                fileHash = flight.fileHash,
                 flightDate = flight.flightDate,
                 pilot = flight.pilot,
                 glider = flight.glider,

@@ -1,21 +1,30 @@
 package com.flightapp.backend.flights
 
 import jakarta.validation.Valid
+import org.springframework.core.io.ByteArrayResource
+import org.springframework.http.ContentDisposition
 import org.springframework.http.HttpHeaders
-import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.security.oauth2.core.oidc.user.OidcUser
-import org.springframework.web.bind.annotation.*
+import org.springframework.web.bind.annotation.DeleteMapping
+import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PatchMapping
+import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestPart
+import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.multipart.MultipartFile
-import java.util.UUID
 
 @RestController
 @RequestMapping("/api/flights")
 class FlightsController(
     private val flightService: FlightService,
-    private val flightFileService: FlightFileService
+    private val flightFileService: FlightFileService,
+    private val flightImportService: FlightImportService
 ) {
 
     @GetMapping
@@ -26,7 +35,6 @@ class FlightsController(
     }
 
     @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
     fun createFlight(
         @AuthenticationPrincipal oidcUser: OidcUser?,
         @Valid @RequestBody request: CreateFlightRequest
@@ -37,10 +45,26 @@ class FlightsController(
         )
     }
 
+    @PostMapping(
+        "/import",
+        consumes = [MediaType.MULTIPART_FORM_DATA_VALUE]
+    )
+    fun importFlight(
+        @AuthenticationPrincipal oidcUser: OidcUser?,
+        @Valid @RequestPart("metadata") metadata: ImportFlightRequest,
+        @RequestPart("file") file: MultipartFile
+    ): FlightDto {
+        return flightImportService.importFlight(
+            oidcUser = oidcUser,
+            metadata = metadata,
+            file = file
+        )
+    }
+
     @GetMapping("/{id}")
     fun getFlight(
         @AuthenticationPrincipal oidcUser: OidcUser?,
-        @PathVariable id: UUID
+        @PathVariable id: String
     ): FlightDto {
         return flightService.getFlight(
             oidcUser = oidcUser,
@@ -49,10 +73,9 @@ class FlightsController(
     }
 
     @DeleteMapping("/{id}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
     fun deleteFlight(
         @AuthenticationPrincipal oidcUser: OidcUser?,
-        @PathVariable id: UUID
+        @PathVariable id: String
     ) {
         flightService.deleteFlight(
             oidcUser = oidcUser,
@@ -63,34 +86,31 @@ class FlightsController(
     @PatchMapping("/{id}/visibility")
     fun updateVisibility(
         @AuthenticationPrincipal oidcUser: OidcUser?,
-        @PathVariable id: UUID,
+        @PathVariable id: String,
         @Valid @RequestBody request: UpdateFlightVisibilityRequest
     ): FlightDto {
         return flightService.updateVisibility(
             oidcUser = oidcUser,
             flightId = id,
-            request = request
+            visibility = request.visibility
         )
     }
 
     @PostMapping("/{id}/file")
-    @ResponseStatus(HttpStatus.CREATED)
     fun createFlightFile(
         @AuthenticationPrincipal oidcUser: OidcUser?,
-        @PathVariable id: UUID,
-        @Valid @RequestBody request: CreateFlightFileRequest
+        @PathVariable id: String
     ): FlightFileDto {
         return flightFileService.createFlightFile(
             oidcUser = oidcUser,
-            flightId = id,
-            request = request
+            flightId = id
         )
     }
 
     @GetMapping("/{id}/file")
     fun getFlightFile(
         @AuthenticationPrincipal oidcUser: OidcUser?,
-        @PathVariable id: UUID
+        @PathVariable id: String
     ): FlightFileDto {
         return flightFileService.getFlightFile(
             oidcUser = oidcUser,
@@ -98,27 +118,11 @@ class FlightsController(
         )
     }
 
-    @PatchMapping("/{id}/file")
-    fun updateFlightFile(
-        @AuthenticationPrincipal oidcUser: OidcUser?,
-        @PathVariable id: UUID,
-        @Valid @RequestBody request: UpdateFlightFileRequest
-    ): FlightFileDto {
-        return flightFileService.updateFlightFile(
-            oidcUser = oidcUser,
-            flightId = id,
-            request = request
-        )
-    }
-
-    @PostMapping(
-        "/{id}/igc",
-        consumes = [MediaType.MULTIPART_FORM_DATA_VALUE]
-    )
+    @PostMapping("/{id}/igc", consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
     fun uploadOriginalIgc(
         @AuthenticationPrincipal oidcUser: OidcUser?,
-        @PathVariable id: UUID,
-        @RequestParam("file") file: MultipartFile
+        @PathVariable id: String,
+        @RequestPart("file") file: MultipartFile
     ): FlightFileDto {
         return flightFileService.uploadOriginalIgc(
             oidcUser = oidcUser,
@@ -130,20 +134,36 @@ class FlightsController(
     @GetMapping("/{id}/igc")
     fun downloadOriginalIgc(
         @AuthenticationPrincipal oidcUser: OidcUser?,
-        @PathVariable id: UUID
-    ): ResponseEntity<ByteArray> {
-        val download = flightFileService.downloadOriginalIgc(
+        @PathVariable id: String
+    ): ResponseEntity<ByteArrayResource> {
+        val content = flightFileService.downloadOriginalIgc(
             oidcUser = oidcUser,
             flightId = id
         )
 
+        val resource = ByteArrayResource(content)
+
         return ResponseEntity.ok()
+            .contentType(MediaType.APPLICATION_OCTET_STREAM)
+            .contentLength(content.size.toLong())
             .header(
                 HttpHeaders.CONTENT_DISPOSITION,
-                "attachment; filename=\"${download.fileName}\""
+                ContentDisposition.attachment()
+                    .filename("$id.igc")
+                    .build()
+                    .toString()
             )
-            .contentType(MediaType.APPLICATION_OCTET_STREAM)
-            .contentLength(download.bytes.size.toLong())
-            .body(download.bytes)
+            .body(resource)
+    }
+
+    @DeleteMapping("/{id}/igc")
+    fun deleteOriginalIgc(
+        @AuthenticationPrincipal oidcUser: OidcUser?,
+        @PathVariable id: String
+    ): FlightFileDto {
+        return flightFileService.deleteOriginalIgc(
+            oidcUser = oidcUser,
+            flightId = id
+        )
     }
 }

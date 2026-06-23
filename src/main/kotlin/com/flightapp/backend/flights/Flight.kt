@@ -12,15 +12,14 @@ import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
 import java.time.Instant
 import java.time.LocalDate
-import java.util.UUID
 
 @Entity
 @Table(name = "flights")
 class Flight(
 
     @Id
-    @Column(name = "id", nullable = false)
-    var id: UUID,
+    @Column(name = "id", nullable = false, length = 64)
+    var id: String,
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
@@ -28,9 +27,6 @@ class Flight(
 
     @Column(name = "file_name", nullable = false, length = 500)
     var fileName: String,
-
-    @Column(name = "file_hash", nullable = false, length = 128)
-    var fileHash: String,
 
     @Column(name = "flight_date")
     var flightDate: LocalDate? = null,
@@ -42,7 +38,7 @@ class Flight(
     var glider: String? = null,
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "visibility", nullable = false, length = 30)
+    @Column(name = "visibility", nullable = false, length = 20)
     var visibility: FlightVisibility = FlightVisibility.PRIVATE,
 
     @Column(name = "imported_at_utc", nullable = false)

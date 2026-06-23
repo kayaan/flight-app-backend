@@ -1,25 +1,25 @@
 package com.flightapp.backend.flights
 
 import java.time.Instant
-import java.util.UUID
 
 data class FlightFileDto(
-    val id: UUID,
-    val flightId: UUID,
+    val flightId: String,
     val originalIgcBlobName: String?,
     val fileSizeBytes: Long?,
     val contentHash: String?,
-    val createdAtUtc: Instant
+    val createdAtUtc: Instant,
+    val updatedAtUtc: Instant
 ) {
     companion object {
-        fun from(file: FlightFile): FlightFileDto =
-            FlightFileDto(
-                id = file.id,
-                flightId = file.flight.id,
+        fun from(file: FlightFile): FlightFileDto {
+            return FlightFileDto(
+                flightId = file.flightId,
                 originalIgcBlobName = file.originalIgcBlobName,
                 fileSizeBytes = file.fileSizeBytes,
                 contentHash = file.contentHash,
-                createdAtUtc = file.createdAtUtc
+                createdAtUtc = file.createdAtUtc,
+                updatedAtUtc = file.updatedAtUtc
             )
+        }
     }
 }
