@@ -33,8 +33,11 @@ create table flights (
                          updated_at_utc timestamp not null,
                          deleted_at_utc timestamp,
 
-                         constraint chk_flights_id_sha256 check (id ~ '^[a-f0-9]{64}$'),
-    constraint chk_flights_visibility check (visibility in ('PRIVATE', 'UNLISTED', 'PUBLIC'))
+                         constraint chk_flights_id_sha256
+                             check (id ~ '^[a-f0-9]{64}$'),
+
+    constraint chk_flights_visibility
+        check (visibility in ('PRIVATE', 'UNLISTED', 'PUBLIC'))
 );
 
 create index idx_flights_user_id
@@ -45,20 +48,6 @@ create index idx_flights_user_imported
 
 create index idx_flights_deleted_at
     on flights(deleted_at_utc);
-
-create table flight_files (
-                              flight_id varchar(64) primary key references flights(id) on delete cascade,
-
-                              original_igc_blob_name text,
-                              file_size_bytes bigint,
-                              content_hash varchar(64),
-
-                              created_at_utc timestamp not null,
-                              updated_at_utc timestamp not null,
-
-                              constraint chk_flight_files_content_hash_sha256
-                                  check (content_hash is null or content_hash ~ '^[a-f0-9]{64}$')
-    );
 
 create table flight_stats (
                               flight_id varchar(64) primary key references flights(id) on delete cascade,
@@ -81,16 +70,55 @@ create table flight_stats (
                               max_alt_baro_m double precision not null,
                               gain_baro_m double precision not null,
 
-                              avg_speed_kmh double precision not null,
-                              max_speed_kmh double precision not null,
+                              created_at_utc timestamp not null,
+                              updated_at_utc timestamp not null,
+
+                              constraint chk_flight_stats_indices
+                                  check (start_index >= 0 and end_index >= start_index),
+
+                              constraint chk_flight_stats_fix_count
+                                  check (fix_count >= 0),
+
+                              constraint chk_flight_stats_duration
+                                  check (duration_sec >= 0),
+
+                              constraint chk_flight_stats_distance
+                                  check (distance_m >= 0)
+);
+
+create table flight_tracks (
+                               flight_id varchar(64) primary key references flights(id) on delete cascade,
+
+                               track_blob_name text not null,
+                               format_version integer not null,
+                               point_count integer not null,
+
+                               created_at_utc timestamp not null,
+                               updated_at_utc timestamp not null,
+
+                               constraint chk_flight_tracks_format_version
+                                   check (format_version >= 1),
+
+                               constraint chk_flight_tracks_point_count
+                                   check (point_count >= 0)
+);
+
+create table flight_files (
+                              flight_id varchar(64) primary key references flights(id) on delete cascade,
+
+                              igc_blob_name text not null,
+                              file_name varchar(500) not null,
+                              file_size_bytes bigint not null,
+                              content_hash varchar(64) not null,
 
                               created_at_utc timestamp not null,
                               updated_at_utc timestamp not null,
 
-                              constraint chk_flight_stats_indices check (start_index >= 0 and end_index >= start_index),
-                              constraint chk_flight_stats_fix_count check (fix_count >= 0),
-                              constraint chk_flight_stats_duration check (duration_sec >= 0),
-                              constraint chk_flight_stats_distance check (distance_m >= 0)
+                              constraint chk_flight_files_content_hash_sha256
+                                  check (content_hash ~ '^[a-f0-9]{64}$'),
+
+    constraint chk_flight_files_size
+        check (file_size_bytes >= 0)
 );
 
 create table flight_shares (

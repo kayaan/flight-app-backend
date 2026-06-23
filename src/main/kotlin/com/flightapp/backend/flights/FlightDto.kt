@@ -5,7 +5,6 @@ import java.time.LocalDate
 
 data class FlightDto(
     val id: String,
-    val fileHash: String,
     val fileName: String,
     val flightDate: LocalDate?,
     val pilot: String?,
@@ -19,7 +18,6 @@ data class FlightDto(
         fun from(flight: Flight): FlightDto {
             return FlightDto(
                 id = flight.id,
-                fileHash = flight.id,
                 fileName = flight.fileName,
                 flightDate = flight.flightDate,
                 pilot = flight.pilot,

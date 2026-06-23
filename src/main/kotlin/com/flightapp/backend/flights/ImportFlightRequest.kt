@@ -25,5 +25,8 @@ data class ImportFlightRequest(
     val importedAtUtc: Instant? = null,
 
     @field:Valid
-    val stats: ImportFlightStatsRequest? = null
+    val stats: ImportFlightStatsRequest,
+
+    @field:Valid
+    val track: ImportFlightTrackRequest
 )

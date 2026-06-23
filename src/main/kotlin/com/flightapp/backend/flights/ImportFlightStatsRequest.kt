@@ -28,8 +28,5 @@ data class ImportFlightStatsRequest(
 
     val minAltBaroM: Double,
     val maxAltBaroM: Double,
-    val gainBaroM: Double,
-
-    val avgSpeedKmh: Double,
-    val maxSpeedKmh: Double
+    val gainBaroM: Double
 )

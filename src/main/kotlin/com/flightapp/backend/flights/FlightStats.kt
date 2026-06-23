@@ -62,12 +62,6 @@ class FlightStats(
     @Column(name = "gain_baro_m", nullable = false)
     var gainBaroM: Double,
 
-    @Column(name = "avg_speed_kmh", nullable = false)
-    var avgSpeedKmh: Double,
-
-    @Column(name = "max_speed_kmh", nullable = false)
-    var maxSpeedKmh: Double,
-
     @Column(name = "created_at_utc", nullable = false)
     var createdAtUtc: Instant,
 

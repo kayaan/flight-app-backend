@@ -34,17 +34,6 @@ class FlightsController(
         return flightService.getFlights(oidcUser)
     }
 
-    @PostMapping
-    fun createFlight(
-        @AuthenticationPrincipal oidcUser: OidcUser?,
-        @Valid @RequestBody request: CreateFlightRequest
-    ): FlightDto {
-        return flightService.createFlight(
-            oidcUser = oidcUser,
-            request = request
-        )
-    }
-
     @PostMapping(
         "/import",
         consumes = [MediaType.MULTIPART_FORM_DATA_VALUE]
@@ -96,17 +85,6 @@ class FlightsController(
         )
     }
 
-    @PostMapping("/{id}/file")
-    fun createFlightFile(
-        @AuthenticationPrincipal oidcUser: OidcUser?,
-        @PathVariable id: String
-    ): FlightFileDto {
-        return flightFileService.createFlightFile(
-            oidcUser = oidcUser,
-            flightId = id
-        )
-    }
-
     @GetMapping("/{id}/file")
     fun getFlightFile(
         @AuthenticationPrincipal oidcUser: OidcUser?,
@@ -115,19 +93,6 @@ class FlightsController(
         return flightFileService.getFlightFile(
             oidcUser = oidcUser,
             flightId = id
-        )
-    }
-
-    @PostMapping("/{id}/igc", consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
-    fun uploadOriginalIgc(
-        @AuthenticationPrincipal oidcUser: OidcUser?,
-        @PathVariable id: String,
-        @RequestPart("file") file: MultipartFile
-    ): FlightFileDto {
-        return flightFileService.uploadOriginalIgc(
-            oidcUser = oidcUser,
-            flightId = id,
-            file = file
         )
     }
 
@@ -154,16 +119,5 @@ class FlightsController(
                     .toString()
             )
             .body(resource)
-    }
-
-    @DeleteMapping("/{id}/igc")
-    fun deleteOriginalIgc(
-        @AuthenticationPrincipal oidcUser: OidcUser?,
-        @PathVariable id: String
-    ): FlightFileDto {
-        return flightFileService.deleteOriginalIgc(
-            oidcUser = oidcUser,
-            flightId = id
-        )
     }
 }

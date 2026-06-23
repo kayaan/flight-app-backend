@@ -1,7 +1,9 @@
 package com.flightapp.backend.flights
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.flightapp.backend.auth.CurrentUserService
 import com.flightapp.backend.storage.FlightBlobStorage
+import com.flightapp.backend.users.AppUser
 import org.springframework.http.HttpStatus
 import org.springframework.security.oauth2.core.oidc.user.OidcUser
 import org.springframework.stereotype.Service
@@ -15,14 +17,18 @@ import java.time.Instant
 @Service
 class FlightImportService(
     private val flightRepository: FlightRepository,
-    private val flightFileRepository: FlightFileRepository,
     private val flightStatsRepository: FlightStatsRepository,
+    private val flightFileRepository: FlightFileRepository,
+    private val flightTrackRepository: FlightTrackRepository,
     private val flightBlobStorage: FlightBlobStorage,
     private val currentUserService: CurrentUserService
 ) {
 
+    private val objectMapper = ObjectMapper()
+
     companion object {
         private const val MAX_IGC_FILE_SIZE_BYTES = 10L * 1024L * 1024L
+        private const val TRACK_FORMAT_VERSION = 1
     }
 
     @Transactional
@@ -34,13 +40,14 @@ class FlightImportService(
         val user = currentUserService.requireCurrentUser(oidcUser)
 
         validateIgcFile(file)
+        metadata.track.validateSameLength()
 
-        val bytes = file.bytes
-        val text = bytes.toString(StandardCharsets.UTF_8)
+        val igcBytes = file.bytes
+        val igcText = igcBytes.toString(StandardCharsets.UTF_8)
 
-        validateIgcContent(text)
+        validateIgcContent(igcText)
 
-        val contentHash = sha256Hex(bytes)
+        val contentHash = sha256Hex(igcBytes)
 
         if (metadata.id != null && metadata.id != contentHash) {
             throw ResponseStatusException(
@@ -51,95 +58,99 @@ class FlightImportService(
 
         val now = Instant.now()
         val flightId = contentHash
-        val blobName = "flights/$flightId/original.igc"
+
+        val igcBlobName = "flights/$flightId/original.igc"
+        val trackBlobName = "flights/$flightId/track-v1.json"
+
+        val trackJsonBytes = objectMapper.writeValueAsBytes(metadata.track)
 
         flightBlobStorage.save(
-            blobName = blobName,
-            content = bytes
+            blobName = igcBlobName,
+            content = igcBytes
+        )
+
+        flightBlobStorage.save(
+            blobName = trackBlobName,
+            content = trackJsonBytes
         )
 
         try {
-            val existingFlight = flightRepository
-                .findByIdAndUserAndDeletedAtUtcIsNull(flightId, user)
-
-            val flight = if (existingFlight != null) {
-                existingFlight.apply {
-                    fileName = metadata.fileName ?: file.originalFilename ?: fileName
-                    flightDate = metadata.flightDate
-                    pilot = metadata.pilot
-                    glider = metadata.glider
-                    importedAtUtc = metadata.importedAtUtc ?: importedAtUtc
-                    updatedAtUtc = now
-                }
-            } else {
-                Flight(
-                    id = flightId,
-                    user = user,
-                    fileName = metadata.fileName ?: file.originalFilename ?: "$flightId.igc",
-                    flightDate = metadata.flightDate,
-                    pilot = metadata.pilot,
-                    glider = metadata.glider,
-                    visibility = FlightVisibility.PRIVATE,
-                    importedAtUtc = metadata.importedAtUtc ?: now,
-                    createdAtUtc = now,
-                    updatedAtUtc = now,
-                    deletedAtUtc = null
-                )
-            }
-
-            val savedFlight = flightRepository.save(flight)
-
-            saveOrUpdateFlightFile(
-                flight = savedFlight,
-                blobName = blobName,
-                contentHash = contentHash,
-                fileSizeBytes = bytes.size.toLong(),
+            val flight = saveOrUpdateFlight(
+                user = user,
+                flightId = flightId,
+                metadata = metadata,
+                file = file,
                 now = now
             )
 
-            val stats = metadata.stats
-            if (stats != null) {
-                saveOrUpdateFlightStats(
-                    flight = savedFlight,
-                    request = stats,
-                    now = now
-                )
-            }
+            saveOrUpdateStats(
+                flight = flight,
+                request = metadata.stats,
+                now = now
+            )
 
-            return FlightDto.from(savedFlight)
+            saveOrUpdateFile(
+                flight = flight,
+                igcBlobName = igcBlobName,
+                file = file,
+                contentHash = contentHash,
+                now = now
+            )
+
+            saveOrUpdateTrack(
+                flight = flight,
+                trackBlobName = trackBlobName,
+                request = metadata.track,
+                now = now
+            )
+
+            return FlightDto.from(flight)
         } catch (exception: Exception) {
-            flightBlobStorage.delete(blobName)
+            flightBlobStorage.delete(igcBlobName)
+            flightBlobStorage.delete(trackBlobName)
             throw exception
         }
     }
 
-    private fun saveOrUpdateFlightFile(
-        flight: Flight,
-        blobName: String,
-        contentHash: String,
-        fileSizeBytes: Long,
+    private fun saveOrUpdateFlight(
+        user: AppUser,
+        flightId: String,
+        metadata: ImportFlightRequest,
+        file: MultipartFile,
         now: Instant
-    ) {
-        val flightFile = flightFileRepository.findByFlightId(flight.id)
-            ?: FlightFile(
-                flightId = flight.id,
-                flight = flight,
-                originalIgcBlobName = null,
-                fileSizeBytes = null,
-                contentHash = null,
-                createdAtUtc = now,
+    ): Flight {
+        val existingFlight = flightRepository
+            .findByIdAndUserAndDeletedAtUtcIsNull(flightId, user)
+
+        val flight = if (existingFlight != null) {
+            existingFlight.apply {
+                fileName = metadata.fileName ?: file.originalFilename ?: fileName
+                flightDate = metadata.flightDate
+                pilot = metadata.pilot
+                glider = metadata.glider
+                importedAtUtc = metadata.importedAtUtc ?: importedAtUtc
                 updatedAtUtc = now
+            }
+        } else {
+            Flight(
+                id = flightId,
+                user = user,
+                fileName = metadata.fileName ?: file.originalFilename ?: "$flightId.igc",
+                flightDate = metadata.flightDate,
+                pilot = metadata.pilot,
+                glider = metadata.glider,
+                visibility = FlightVisibility.PRIVATE,
+                importedAtUtc = metadata.importedAtUtc ?: now,
+                createdAtUtc = now,
+                updatedAtUtc = now,
+                deletedAtUtc = null
             )
+        }
 
-        flightFile.originalIgcBlobName = blobName
-        flightFile.fileSizeBytes = fileSizeBytes
-        flightFile.contentHash = contentHash
-        flightFile.updatedAtUtc = now
-
-        flightFileRepository.save(flightFile)
+        return flightRepository.save(flight)
     }
 
-    private fun saveOrUpdateFlightStats(
+    private fun saveOrUpdateStats(
         flight: Flight,
         request: ImportFlightStatsRequest,
         now: Instant
@@ -168,8 +179,6 @@ class FlightImportService(
                 minAltBaroM = request.minAltBaroM,
                 maxAltBaroM = request.maxAltBaroM,
                 gainBaroM = request.gainBaroM,
-                avgSpeedKmh = request.avgSpeedKmh,
-                maxSpeedKmh = request.maxSpeedKmh,
                 createdAtUtc = now,
                 updatedAtUtc = now
             )
@@ -187,11 +196,64 @@ class FlightImportService(
         stats.minAltBaroM = request.minAltBaroM
         stats.maxAltBaroM = request.maxAltBaroM
         stats.gainBaroM = request.gainBaroM
-        stats.avgSpeedKmh = request.avgSpeedKmh
-        stats.maxSpeedKmh = request.maxSpeedKmh
         stats.updatedAtUtc = now
 
         flightStatsRepository.save(stats)
+    }
+
+    private fun saveOrUpdateFile(
+        flight: Flight,
+        igcBlobName: String,
+        file: MultipartFile,
+        contentHash: String,
+        now: Instant
+    ) {
+        val fileName = file.originalFilename ?: "${flight.id}.igc"
+
+        val flightFile = flightFileRepository.findByFlightId(flight.id)
+            ?: FlightFile(
+                flightId = flight.id,
+                flight = flight,
+                igcBlobName = igcBlobName,
+                fileName = fileName,
+                fileSizeBytes = file.size,
+                contentHash = contentHash,
+                createdAtUtc = now,
+                updatedAtUtc = now
+            )
+
+        flightFile.igcBlobName = igcBlobName
+        flightFile.fileName = fileName
+        flightFile.fileSizeBytes = file.size
+        flightFile.contentHash = contentHash
+        flightFile.updatedAtUtc = now
+
+        flightFileRepository.save(flightFile)
+    }
+
+    private fun saveOrUpdateTrack(
+        flight: Flight,
+        trackBlobName: String,
+        request: ImportFlightTrackRequest,
+        now: Instant
+    ) {
+        val flightTrack = flightTrackRepository.findByFlightId(flight.id)
+            ?: FlightTrack(
+                flightId = flight.id,
+                flight = flight,
+                trackBlobName = trackBlobName,
+                formatVersion = TRACK_FORMAT_VERSION,
+                pointCount = request.pointCount(),
+                createdAtUtc = now,
+                updatedAtUtc = now
+            )
+
+        flightTrack.trackBlobName = trackBlobName
+        flightTrack.formatVersion = request.formatVersion
+        flightTrack.pointCount = request.pointCount()
+        flightTrack.updatedAtUtc = now
+
+        flightTrackRepository.save(flightTrack)
     }
 
     private fun validateIgcFile(file: MultipartFile) {

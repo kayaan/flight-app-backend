@@ -23,9 +23,6 @@ data class FlightStatsDto(
     val maxAltBaroM: Double,
     val gainBaroM: Double,
 
-    val avgSpeedKmh: Double,
-    val maxSpeedKmh: Double,
-
     val createdAtUtc: Instant,
     val updatedAtUtc: Instant
 ) {
@@ -51,9 +48,6 @@ data class FlightStatsDto(
                 minAltBaroM = stats.minAltBaroM,
                 maxAltBaroM = stats.maxAltBaroM,
                 gainBaroM = stats.gainBaroM,
-
-                avgSpeedKmh = stats.avgSpeedKmh,
-                maxSpeedKmh = stats.maxSpeedKmh,
 
                 createdAtUtc = stats.createdAtUtc,
                 updatedAtUtc = stats.updatedAtUtc

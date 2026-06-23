@@ -4,9 +4,10 @@ import java.time.Instant
 
 data class FlightFileDto(
     val flightId: String,
-    val originalIgcBlobName: String?,
-    val fileSizeBytes: Long?,
-    val contentHash: String?,
+    val igcBlobName: String,
+    val fileName: String,
+    val fileSizeBytes: Long,
+    val contentHash: String,
     val createdAtUtc: Instant,
     val updatedAtUtc: Instant
 ) {
@@ -14,7 +15,8 @@ data class FlightFileDto(
         fun from(file: FlightFile): FlightFileDto {
             return FlightFileDto(
                 flightId = file.flightId,
-                originalIgcBlobName = file.originalIgcBlobName,
+                igcBlobName = file.igcBlobName,
+                fileName = file.fileName,
                 fileSizeBytes = file.fileSizeBytes,
                 contentHash = file.contentHash,
                 createdAtUtc = file.createdAtUtc,

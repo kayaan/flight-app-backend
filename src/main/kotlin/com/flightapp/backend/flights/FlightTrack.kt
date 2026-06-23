@@ -11,8 +11,8 @@ import jakarta.persistence.Table
 import java.time.Instant
 
 @Entity
-@Table(name = "flight_files")
-class FlightFile(
+@Table(name = "flight_tracks")
+class FlightTrack(
 
     @Id
     @Column(name = "flight_id", nullable = false, length = 64)
@@ -23,17 +23,14 @@ class FlightFile(
     @JoinColumn(name = "flight_id", nullable = false)
     var flight: Flight,
 
-    @Column(name = "igc_blob_name", nullable = false)
-    var igcBlobName: String,
+    @Column(name = "track_blob_name", nullable = false)
+    var trackBlobName: String,
 
-    @Column(name = "file_name", nullable = false, length = 500)
-    var fileName: String,
+    @Column(name = "format_version", nullable = false)
+    var formatVersion: Int,
 
-    @Column(name = "file_size_bytes", nullable = false)
-    var fileSizeBytes: Long,
-
-    @Column(name = "content_hash", nullable = false, length = 64)
-    var contentHash: String,
+    @Column(name = "point_count", nullable = false)
+    var pointCount: Int,
 
     @Column(name = "created_at_utc", nullable = false)
     var createdAtUtc: Instant,

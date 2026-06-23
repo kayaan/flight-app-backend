@@ -23,34 +23,6 @@ class FlightFileService(
         private const val MAX_IGC_FILE_SIZE_BYTES = 10L * 1024L * 1024L
     }
 
-    fun createFlightFile(
-        oidcUser: OidcUser?,
-        flightId: String
-    ): FlightFileDto {
-        val flight = requireOwnedFlight(oidcUser, flightId)
-
-        val existing = flightFileRepository.findByFlightId(flightId)
-        if (existing != null) {
-            return FlightFileDto.from(existing)
-        }
-
-        val now = Instant.now()
-
-        val flightFile = FlightFile(
-            flightId = flight.id,
-            flight = flight,
-            originalIgcBlobName = null,
-            fileSizeBytes = null,
-            contentHash = null,
-            createdAtUtc = now,
-            updatedAtUtc = now
-        )
-
-        val saved = flightFileRepository.save(flightFile)
-
-        return FlightFileDto.from(saved)
-    }
-
     fun getFlightFile(
         oidcUser: OidcUser?,
         flightId: String
@@ -89,28 +61,30 @@ class FlightFileService(
             )
         }
 
-        val blobName = "flights/${flight.id}/original.igc"
+        val now = Instant.now()
+        val igcBlobName = "flights/${flight.id}/original.igc"
+        val fileName = file.originalFilename ?: "${flight.id}.igc"
 
         flightBlobStorage.save(
-            blobName = blobName,
+            blobName = igcBlobName,
             content = bytes
         )
-
-        val now = Instant.now()
 
         val flightFile = flightFileRepository.findByFlightId(flight.id)
             ?: FlightFile(
                 flightId = flight.id,
                 flight = flight,
-                originalIgcBlobName = null,
-                fileSizeBytes = null,
-                contentHash = null,
+                igcBlobName = igcBlobName,
+                fileName = fileName,
+                fileSizeBytes = file.size,
+                contentHash = contentHash,
                 createdAtUtc = now,
                 updatedAtUtc = now
             )
 
-        flightFile.originalIgcBlobName = blobName
-        flightFile.fileSizeBytes = bytes.size.toLong()
+        flightFile.igcBlobName = igcBlobName
+        flightFile.fileName = fileName
+        flightFile.fileSizeBytes = file.size
         flightFile.contentHash = contentHash
         flightFile.updatedAtUtc = now
 
@@ -131,41 +105,7 @@ class FlightFileService(
                 "Flight file not found."
             )
 
-        val blobName = flightFile.originalIgcBlobName
-            ?: throw ResponseStatusException(
-                HttpStatus.NOT_FOUND,
-                "Original IGC file not uploaded."
-            )
-
-        return flightBlobStorage.load(blobName)
-    }
-
-    fun deleteOriginalIgc(
-        oidcUser: OidcUser?,
-        flightId: String
-    ): FlightFileDto {
-        requireOwnedFlight(oidcUser, flightId)
-
-        val flightFile = flightFileRepository.findByFlightId(flightId)
-            ?: throw ResponseStatusException(
-                HttpStatus.NOT_FOUND,
-                "Flight file not found."
-            )
-
-        val blobName = flightFile.originalIgcBlobName
-
-        if (blobName != null) {
-            flightBlobStorage.delete(blobName)
-        }
-
-        flightFile.originalIgcBlobName = null
-        flightFile.fileSizeBytes = null
-        flightFile.contentHash = null
-        flightFile.updatedAtUtc = Instant.now()
-
-        val saved = flightFileRepository.save(flightFile)
-
-        return FlightFileDto.from(saved)
+        return flightBlobStorage.load(flightFile.igcBlobName)
     }
 
     private fun requireOwnedFlight(
