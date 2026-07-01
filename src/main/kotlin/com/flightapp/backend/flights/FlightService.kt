@@ -6,11 +6,13 @@ import org.springframework.security.oauth2.core.oidc.user.OidcUser
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
 import java.time.Instant
+import org.springframework.transaction.annotation.Transactional
 
 @Service
 class FlightService(
     private val flightRepository: FlightRepository,
-    private val currentUserService: CurrentUserService
+    private val currentUserService: CurrentUserService,
+    private val flightSyncEventService: FlightSyncEventService
 ) {
 
     fun getFlights(oidcUser: OidcUser?): List<FlightDto> {
@@ -19,40 +21,6 @@ class FlightService(
         return flightRepository
             .findByUserAndDeletedAtUtcIsNullOrderByImportedAtUtcDesc(user)
             .map { FlightDto.from(it) }
-    }
-
-    fun createFlight(
-        oidcUser: OidcUser?,
-        request: CreateFlightRequest
-    ): FlightDto {
-        val user = currentUserService.requireCurrentUser(oidcUser)
-
-        if (flightRepository.existsByIdAndUserAndDeletedAtUtcIsNull(request.id, user)) {
-            throw ResponseStatusException(
-                HttpStatus.CONFLICT,
-                "Flight already exists."
-            )
-        }
-
-        val now = Instant.now()
-
-        val flight = Flight(
-            id = request.id,
-            user = user,
-            fileName = request.fileName,
-            flightDate = request.flightDate,
-            pilot = request.pilot,
-            glider = request.glider,
-            visibility = FlightVisibility.PRIVATE,
-            importedAtUtc = request.importedAtUtc ?: now,
-            createdAtUtc = now,
-            updatedAtUtc = now,
-            deletedAtUtc = null
-        )
-
-        val saved = flightRepository.save(flight)
-
-        return FlightDto.from(saved)
     }
 
     fun getFlight(
@@ -64,6 +32,7 @@ class FlightService(
         return FlightDto.from(flight)
     }
 
+    @Transactional
     fun deleteFlight(
         oidcUser: OidcUser?,
         flightId: String
@@ -74,9 +43,16 @@ class FlightService(
         flight.deletedAtUtc = now
         flight.updatedAtUtc = now
 
-        flightRepository.save(flight)
+        val saved =  flightRepository.save(flight)
+
+        flightSyncEventService.notifyFlightChanged(
+            user = saved.user,
+            flightId = saved.id,
+            type = "deleted"
+        )
     }
 
+    @Transactional
     fun updateVisibility(
         oidcUser: OidcUser?,
         flightId: String,
@@ -88,6 +64,12 @@ class FlightService(
         flight.updatedAtUtc = Instant.now()
 
         val saved = flightRepository.save(flight)
+
+        flightSyncEventService.notifyFlightChanged(
+            user = saved.user,
+            flightId = saved.id,
+            type = "visibilityChanged"
+        )
 
         return FlightDto.from(saved)
     }

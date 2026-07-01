@@ -21,7 +21,8 @@ class FlightImportService(
     private val flightFileRepository: FlightFileRepository,
     private val flightTrackRepository: FlightTrackRepository,
     private val flightBlobStorage: FlightBlobStorage,
-    private val currentUserService: CurrentUserService
+    private val currentUserService: CurrentUserService,
+    private val flightSyncEventService: FlightSyncEventService
 ) {
 
     private val objectMapper = ObjectMapper()
@@ -102,6 +103,12 @@ class FlightImportService(
                 trackBlobName = trackBlobName,
                 request = metadata.track,
                 now = now
+            )
+
+            flightSyncEventService.notifyFlightChanged(
+                user = user,
+                flightId = flight.id,
+                type = "uploaded"
             )
 
             return FlightDto.from(flight)
